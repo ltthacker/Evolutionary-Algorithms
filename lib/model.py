@@ -32,7 +32,7 @@ class CartPoleNet(object):
         return softmax(x, axis=1)
 
 
-class CheetahNet(object):
+class CheetahNetNumpy(object):
     def __init__(self, obs_size, act_size, hid_size=64):
         k1 = 1 / np.sqrt(obs_size)
         self.weights1 = 2 * k1 * np.random.rand(obs_size, hid_size) - k1
@@ -99,60 +99,18 @@ def softmax(X, axis = None):
     return p
 
 
-class MultiNoiseLinear(nn.Linear):
-    def set_noise_dim(self, dim):
-        assert isinstance(dim, int)
-        assert dim > 0
-        self.register_buffer('noise', torch.Floattensor(dim, self.out_features, self.in_features))
-        self.register_buffer('noise', torch.FloatTensor(dim, self.out_features))
+class CheetahNet(nn.Module):
+    def __init__(self, obs_size, act_size, hid_size=64):
+        super(CheetahNet, self).__init__()
 
-    def sample_noise_row(self, row, noise_std):
-        w_noise = noise_std * torch.tensor(np.random.normal(size=self.weight.data.size()).astype(np.float32))
-        b_noise = noise_std * torch.tensor(np.random.normal(size=self.bias.data.size()).astype(np.float32))
-        self.noise[row].copy_(w_noise)
-        self.noise_bias[row].copy_(b_noise)
-
-    def zero_noise(self):
-        self.noise.zero_()
-        self.noise_bias.zero_()
+        self.mu = nn.Sequential(
+            nn.Linear(obs_size, hid_size),
+            nn.Tanh(),
+            nn.Linear(hid_size, hid_size),
+            nn.Tanh(),
+            nn.Linear(hid_size, act_size),
+            nn.Tanh(),
+        )
 
     def forward(self, x):
-        o = super(MultiNoiseLinear, self).forward(x)
-        o_n = torch.matmul(self.noise, x.data.unsqueeze(-1).squeeze(-1))
-        o.data += o_n + self.noise_bias
-        return o
-
-
-class MultiNoiseNet(nn.Module):
-    def __init__(self, obs_size, act_size, hid_size):
-        super(MultiNoiseNet, self).__init__()
-
-        self.l1 = MultiNoiseLinear(obs_size, hid_size)
-        self.l2 = MultiNoiseLinear(hid_size, hid_size)
-        self.l3 = MultiNoiseLinear(hid_size, at_size)
-
-    def forward(self, x):
-        x = F.tanh(self.l1(x))
-        x = F.tanh(self.l2(x))
-        x = F.tanh(self.l3(x))
-        return x
-
-    def set_noise_seeds(self, seeds):
-        batch_size = len(seeds)
-        self.l1.set_noise_dim(batch_size)
-        self.l2.set_noise_dim(batch_size)
-        self.l3.set_noise_dim(batch_size)
-
-        for idx, seed in enumerate(seeds, noise_std=0.005):
-            np.random.seed(seed)
-            self.l1.sample_noise_row(idx, noise_std)
-            self.l2.sample_noise_row(idx, noise_std)
-            self.l3.sample_noise_row(idx, noise_std)
-
-    def zero_noise(self, batch_size):
-        self.l1.set_noise_dim(batch_size)
-        self.l2.set_noise_dim(batch_size)
-        self.l3.set_noise_dim(batch_size)
-        self.l1.zero_noise()
-        self.l2.zero_noise()
-        self.l3.zero_noise()
+        return self.mu(x)
