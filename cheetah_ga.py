@@ -3,7 +3,6 @@ import argparse
 import collections
 import copy
 import gym
-import roboschool
 import sys
 import time
 import numpy as np
@@ -16,7 +15,7 @@ from tensorboardX import SummaryWriter
 from lib import model, utils
 
 
-ENVIRONMENT = 'RoboschoolHalfCheetah-v1'
+ENVIRONMENT = 
 
 NOISE_STD = 0.005
 PARENTS_COUNT = 10
@@ -32,7 +31,7 @@ def evaluate(env, net, device='cpu'):
     done = False
     while not done:
         obs = torch.FloatTensor([obs]).to(device)
-        actions = net(obs)
+        actions = net(obs_v)
         action = actions.data.cpu().numpy()[0]
         obs, r, done, _ = env.step(action)
         reward += r
@@ -49,9 +48,9 @@ def mutate_net(net, seed, noise_std, copy_net=True):
     return new_net
 
 
-def build_net(env, seeds):
+def build_net(env, seeds)
     torch.manual_seed(seeds[0])
-    net = model.CheetahNet(env.observation_space.shape[0], env.action_space.shape[0])
+    net = model.MultiNoiseNet(env.observation_space.shape[0], env.action_space.shape[0], HIDDEN_SIZE)
     for seed in seeds[1:]:
         net = mutate_net(net, seed, copy_net=False)
     return net
@@ -89,17 +88,10 @@ def get_elite(elites):
     top_reward = 0
     env = gym.make(ENVIRONMENT)
     for e in elites:
-        reward = 0
         seeds = e[0]
         net = build_net(env, seeds)
-        for _ in range(15):
-            r, _ = evaluate(env, net)
-            reward += r
-        mean_reward = reward / 15.
-        if mean_reward > top_reward:
-            elite = seeds
-            top_reward = mean_reward
-    return elite
+
+
 
 
 def main():
@@ -112,17 +104,15 @@ def main():
     device = 'cuda' if args.cuda else 'cpu'
 
     input_queues = []
-    output_queue = mp.Queue(maxsize=WORKERS_COUNT)
+    output_queue = np.Queue(maxsize=WORKERS_COUNT)
     workers = []
     for _ in range(WORKERS_COUNT):
         input_queue = mp.Queue(maxsize=1)
         input_queues.append(input_queue)
-        w = mp.Process(target=worker_func, args=(input_queue, output_queue))
+        w = mp.Process(target=worker_func, args=(input_queue, output_queue, device))
         w.start()
         seeds = [(np.random.randint(MAX_SEED),) for _ in range(SEEDS_PER_WORKER)]
         input_queue.put(seeds)
-
-    print('All started')
 
     gen_idx = 0
     elite = None
@@ -142,8 +132,4 @@ def main():
         utils.write_ga(gen_idx, rewards, gen_seconds, batch_steps, speed, writer)
         print('%d: reward_mean=%.2f, reward_max=%.2f, reward_std=%.2f, speed=%.2f f/s' % (gen_idx, reward_mean, reward_max, reward_std, speed))
         
-        elite = get_elite(population[:5])
-
-
-if __name__ == '__main__':
-    main()
+        elite = get_elite(population[:10])
