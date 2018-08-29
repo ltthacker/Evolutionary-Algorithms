@@ -26,7 +26,7 @@ SEEDS_PER_WORKER = 500
 MAX_SEED = 2 ** 32 - 1
 
 NOVEL_START = 0.05
-NOVEL_GEN = 250
+NOVEL_GEN = 400
 
 
 def euclidean_distance(x, y):
